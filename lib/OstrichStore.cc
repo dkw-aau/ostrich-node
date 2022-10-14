@@ -344,7 +344,7 @@ public:
   };
 
   void Execute() {
-    TripleVersionsIterator* it = NULL;
+    TripleVersionsIterator* it = nullptr;
     try {
       Controller* controller = store->GetController();
 
@@ -368,8 +368,7 @@ public:
       };
     }
     catch (const runtime_error error) { SetErrorMessage(error.what()); }
-    if (it)
-      delete it;
+    delete it;
   }
 
   void HandleOKCallback() {
@@ -382,22 +381,22 @@ public:
     const Local<String> PREDICATE = Nan::New("predicate").ToLocalChecked();
     const Local<String> OBJECT    = Nan::New("object").ToLocalChecked();
     const Local<String> VERSIONS  = Nan::New("versions").ToLocalChecked();
-    for (vector<TripleVersions*>::iterator it = triples.begin(); it != triples.end(); it++) {
+    for (auto t: triples) {
       Local<Object> tripleObject = Nan::New<Object>();
-      tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New((*it)->get_triple()->get_subject(*dict).c_str()).ToLocalChecked());
-      tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New((*it)->get_triple()->get_predicate(*dict).c_str()).ToLocalChecked());
-      string object = (*it)->get_triple()->get_object(*dict);
+      tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(t->get_triple()->get_subject(*dict).c_str()).ToLocalChecked());
+      tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(t->get_triple()->get_predicate(*dict).c_str()).ToLocalChecked());
+      string object = t->get_triple()->get_object(*dict);
       tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
 
-      Local<Array> versionsArray = Nan::New<Array>((*it)->get_versions()->size());
-      for (uint32_t countVersions = 0; countVersions < (*it)->get_versions()->size(); countVersions++) {
-        versionsArray->Set(Nan::GetCurrentContext(), countVersions, Nan::New((*((*it)->get_versions()))[countVersions]));
+      Local<Array> versionsArray = Nan::New<Array>(t->get_versions()->size());
+      for (uint32_t countVersions = 0; countVersions < t->get_versions()->size(); countVersions++) {
+        versionsArray->Set(Nan::GetCurrentContext(), countVersions, Nan::New((*(t->get_versions()))[countVersions]));
       }
       tripleObject->Set(Nan::GetCurrentContext(), VERSIONS, versionsArray);
 
       triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
-      delete (*it)->get_triple();
-      delete (*it)->get_versions();
+      delete t->get_triple();
+      delete t->get_versions();
     }
 
     // Send the JavaScript array and estimated total count through the callback

@@ -211,8 +211,7 @@ describe('version', () => {
         });
       });
 
-      // eslint-disable-next-line mocha/no-skipped-tests
-      describe.skip('with pattern null null null, offset 20 and limit 5', () => { // TODO: fix me
+      describe('with pattern null null null, offset 20 and limit 5', () => { // TODO: fix me
         let exactCardinality: boolean;
         let cardinality: number;
         let triples: RDF.Quad[];
@@ -283,8 +282,7 @@ describe('version', () => {
         });
       });
 
-      // eslint-disable-next-line mocha/no-skipped-tests
-      describe.skip('with pattern c null null, offset 10 and limit 1', () => { // TODO: fix me
+      describe('with pattern c null null, offset 10 and limit 1', () => { // TODO: fix me
         let exactCardinality: boolean;
         let cardinality: number;
         let triples: RDF.Quad[];
