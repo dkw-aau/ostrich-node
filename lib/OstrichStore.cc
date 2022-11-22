@@ -85,7 +85,7 @@ public:
 
   void Execute() override {
     try {
-      controller = new Controller(path, strategy, HashDB::TCOMPRESS, read_only);
+      controller = new Controller(path, strategy, kyotocabinet::HashDB::TCOMPRESS, read_only);
     }
     catch (const std::invalid_argument& error) { SetErrorMessage(error.what()); }
   }
