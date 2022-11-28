@@ -116,8 +116,8 @@ export async function initializeThreeVersions(tag: string): Promise<OstrichStore
   return ostrichStore;
 }
 
-export async function initializeFourVersions(): Promise<OstrichStore> {
-  const ostrichStore = await ostrich.fromPath('./test/test.ostrich', false, 'interval', '2');
+export async function initializeFourVersions(tag: string): Promise<OstrichStore> {
+  const ostrichStore = await ostrich.fromPath(`./test/test-${tag}.ostrich`, false, 'interval', '2');
   await ostrichStore.append(dataV0, 0);
   await ostrichStore.append(dataV1, 1);
   await ostrichStore.append(dataV2, 2);
