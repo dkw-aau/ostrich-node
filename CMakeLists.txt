@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +43,7 @@ file(GLOB_RECURSE SOURCE_FILES
 
 # Set cmake-js binary
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC -DCOMPRESSED_ADD_VALUES -DCOMPRESSED_DEL_VALUES -DUSE_VSI -DUSE_VSI_T)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
 
