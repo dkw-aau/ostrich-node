@@ -14,6 +14,10 @@ jobs:
           submodules: 'recursive'
       - name: Install Kyoto Cabinet
         run: sudo ./install-kc-ci.sh
+      - name: Install Boost
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install libboost-iostreams-dev
       - uses: actions/cache@v2
         with:
           path: '**/node_modules'
@@ -50,6 +54,10 @@ jobs:
           key: cm-${{ runner.os }}-test-modules-${{ hashFiles('**/yarn.lock') }}
       - name: Install Kyoto Cabinet
         run: sudo ./install-kc-ci.sh
+      - name: Install Boost
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install libboost-iostreams-dev
       - uses: actions/cache@v2
         with:
           path: '**/node_modules'
