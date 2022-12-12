@@ -45,7 +45,7 @@
     "lib/**/*.h"
   ],
   "scripts": {
-    "test": "rm test/*.hdt.index 2> /dev/null; jest ${1}",
+    "test": "rm test/*.hdt.index.v1-1 2> /dev/null; jest ${1}",
     "test-watch": "jest ${1} --watch",
     "coveralls": "jest --coverage && cat ./coverage/lcov.info | coveralls",
     "lint": "eslint . --ext .ts --cache",

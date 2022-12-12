@@ -52,11 +52,17 @@ require_boost_libs(1.70.0 iostreams)
 include_directories(${Boost_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
 
+# Kyoto Cabinet dependencies
+find_library(LZMA lzma REQUIRED)
+find_library(LZO lzo2 REQUIRED)
+find_package(ZLIB REQUIRED)
+
 # Add Kyoto Cabinet
 find_library(KYOTO_CABINET libkyotocabinet.a REQUIRED)
 find_path(KYOTO_INCLUDE_DIR kcplantdb.h REQUIRED)
 include_directories(${KYOTO_INCLUDE_DIR})
-target_link_libraries(${PROJECT_NAME} ${KYOTO_CABINET})
+target_link_libraries(${PROJECT_NAME} ${KYOTO_CABINET} ${LZMA} ${LZO})
+target_link_libraries(${PROJECT_NAME} ZLIB::ZLIB)
 
 # Add pthreads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
