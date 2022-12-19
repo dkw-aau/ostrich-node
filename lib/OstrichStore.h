@@ -12,7 +12,7 @@ enum OstrichStoreFeatures {
 
 class OstrichStore : public Nan::ObjectWrap {
 public:
-    OstrichStore(string path, const v8::Local<v8::Object> &handle, Controller *controller);
+    OstrichStore(std::string path, const v8::Local<v8::Object> &handle, Controller *controller);
 
     static NAN_METHOD(Create);
 

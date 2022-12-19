@@ -524,7 +524,6 @@ public:
     }
 };
 
-// Searches for a triple pattern in the document.
 // JavaScript signature: OstrichStore#_append(version, triples, callback, self)
 NAN_METHOD(OstrichStore::Append) {
     assert(info.Length() == 8);

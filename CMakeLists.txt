@@ -3,6 +3,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# For development with CLion and/or Visual Studio Code
+# Setup CMake.js for regular CMake
+if(NOT DEFINED CMAKE_JS_INC)
+    include("cmakejs.cmake")
+    setup_cmakejs()
+endif()
+
 # Include BoostLib module
 set(NODE_MODULES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/node_modules")
 if(NOT EXISTS "${NODE_MODULES_DIR}/boost-lib/cmake/BoostLib.cmake")
