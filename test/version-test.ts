@@ -73,6 +73,25 @@ describe('version', () => {
 
       await closeAndCleanUp(document, 'vq');
     });
+
+    it('should throw when an internal error is thrown during count', async() => {
+      cleanUp('vq');
+      document = await initializeThreeVersions('vq');
+
+      jest
+        .spyOn(document.native, '_countTriplesVersion')
+        .mockImplementation((
+          subject,
+          predicate,
+          object,
+          cb: any,
+        ) => cb(new Error('Internal error')));
+
+      await expect(document.countTriplesVersion(null, null, null))
+        .rejects.toThrow('Internal error');
+
+      await closeAndCleanUp(document, 'vq');
+    });
   });
 
   describe('An ostrich store for an example ostrich path', () => {
@@ -150,8 +169,8 @@ describe('version', () => {
           expect(cardinality).toEqual(15);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -178,8 +197,8 @@ describe('version', () => {
           expect(cardinality).toEqual(15);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -206,8 +225,8 @@ describe('version', () => {
           expect(cardinality).toEqual(15);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -228,8 +247,8 @@ describe('version', () => {
           expect(cardinality).toEqual(15);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -253,8 +272,8 @@ describe('version', () => {
           expect(cardinality).toEqual(2);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -277,8 +296,8 @@ describe('version', () => {
           expect(cardinality).toEqual(1);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -299,8 +318,8 @@ describe('version', () => {
           expect(cardinality).toEqual(1);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -331,8 +350,8 @@ describe('version', () => {
           expect(cardinality).toEqual(9);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -360,8 +379,8 @@ describe('version', () => {
           expect(cardinality).toEqual(6);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -406,8 +425,8 @@ describe('version', () => {
           expect(cardinality).toEqual(1);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -431,8 +450,8 @@ describe('version', () => {
           expect(cardinality).toEqual(2);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
     });
@@ -450,8 +469,8 @@ describe('version', () => {
           expect(cardinality).toEqual(0);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -467,8 +486,8 @@ describe('version', () => {
           expect(cardinality).toEqual(15);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -484,8 +503,8 @@ describe('version', () => {
           expect(cardinality).toEqual(9);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -501,8 +520,8 @@ describe('version', () => {
           expect(cardinality).toEqual(6);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -535,8 +554,8 @@ describe('version', () => {
           expect(cardinality).toEqual(2);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
 
@@ -552,8 +571,8 @@ describe('version', () => {
           expect(cardinality).toEqual(1);
         });
 
-        it('should be an exact count', () => {
-          expect(exactCardinality).toBe(true);
+        it('should be an estimate count', () => {
+          expect(exactCardinality).toBe(false);
         });
       });
     });

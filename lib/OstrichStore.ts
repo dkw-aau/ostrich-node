@@ -98,9 +98,26 @@ export class OstrichStore {
     object: RDF.Term | undefined | null,
     version = -1,
   ): Promise<{ cardinality: number; exactCardinality: boolean }> {
-    const { cardinality, exactCardinality } = await this
-      .searchTriplesVersionMaterialized(subject, predicate, object, { version, offset: 0, limit: 1 });
-    return { cardinality, exactCardinality };
+    return new Promise((resolve, reject) => {
+      this._operations++;
+      this.native._countTriplesVersionMaterialized(
+        serializeTerm(subject),
+        serializeTerm(predicate),
+        serializeTerm(object),
+        version,
+        (error, totalCount, hasExactCount) => {
+          this._operations--;
+          this._finishOperation();
+          if (error) {
+            return reject(error);
+          }
+          resolve({
+            cardinality: totalCount,
+            exactCardinality: hasExactCount,
+          });
+        },
+      );
+    });
   }
 
   /**
@@ -179,13 +196,27 @@ export class OstrichStore {
     versionStart: number,
     versionEnd: number,
   ): Promise<{ cardinality: number; exactCardinality: boolean }> {
-    const { cardinality, exactCardinality } = await this.searchTriplesDeltaMaterialized(
-      subject,
-      predicate,
-      object,
-      { offset: 0, limit: 1, versionStart, versionEnd },
-    );
-    return { cardinality, exactCardinality };
+    return new Promise((resolve, reject) => {
+      this._operations++;
+      this.native._countTriplesDeltaMaterialized(
+        serializeTerm(subject),
+        serializeTerm(predicate),
+        serializeTerm(object),
+        versionStart,
+        versionEnd,
+        (error, totalCount, hasExactCount) => {
+          this._operations--;
+          this._finishOperation();
+          if (error) {
+            return reject(error);
+          }
+          resolve({
+            cardinality: totalCount,
+            exactCardinality: hasExactCount,
+          });
+        },
+      );
+    });
   }
 
   /**
@@ -249,9 +280,25 @@ export class OstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
   ): Promise<{ cardinality: number; exactCardinality: boolean }> {
-    const { cardinality, exactCardinality } = await this
-      .searchTriplesVersion(subject, predicate, object, { offset: 0, limit: 1 });
-    return { cardinality, exactCardinality };
+    return new Promise((resolve, reject) => {
+      this._operations++;
+      this.native._countTriplesVersion(
+        serializeTerm(subject),
+        serializeTerm(predicate),
+        serializeTerm(object),
+        (error, totalCount, hasExactCount) => {
+          this._operations--;
+          this._finishOperation();
+          if (error) {
+            return reject(error);
+          }
+          resolve({
+            cardinality: totalCount,
+            exactCardinality: hasExactCount,
+          });
+        },
+      );
+    });
   }
 
   /**

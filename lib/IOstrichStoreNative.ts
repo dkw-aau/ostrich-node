@@ -17,6 +17,13 @@ export interface IOstrichStoreNative {
     version: number,
     cb: (error: Error | undefined, triples: IStringQuad[], totalCount: number, hasExactCount: boolean) => void,
   ) => void;
+  _countTriplesVersionMaterialized: (
+    subject: string | null,
+    predicate: string | null,
+    object: string | null,
+    version: number,
+    cb: (error: Error | undefined, totalCount: number, hasExactCount: boolean) => void,
+  ) => void;
   _searchTriplesDeltaMaterialized: (
     subject: string | null,
     predicate: string | null,
@@ -27,6 +34,14 @@ export interface IOstrichStoreNative {
     versionEnd: number,
     cb: (error: Error | undefined, triples: IStringQuadDelta[], totalCount: number, hasExactCount: boolean) => void,
   ) => void;
+  _countTriplesDeltaMaterialized: (
+    subject: string | null,
+    predicate: string | null,
+    object: string | null,
+    versionStart: number,
+    versionEnd: number,
+    cb: (error: Error | undefined, totalCount: number, hasExactCount: boolean) => void,
+  ) => void;
   _searchTriplesVersion: (
     subject: string | null,
     predicate: string | null,
@@ -34,6 +49,12 @@ export interface IOstrichStoreNative {
     offset: number,
     limit: number,
     cb: (error: Error | undefined, triples: IStringQuadVersion[], totalCount: number, hasExactCount: boolean) => void,
+  ) => void;
+  _countTriplesVersion: (
+    subject: string | null,
+    predicate: string | null,
+    object: string | null,
+    cb: (error: Error | undefined, totalCount: number, hasExactCount: boolean) => void,
   ) => void;
   _append: (
     version: number,

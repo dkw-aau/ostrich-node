@@ -90,6 +90,26 @@ describe('version materialization', () => {
 
       await closeAndCleanUp(document, 'vm');
     });
+
+    it('should throw when an internal error is thrown during count', async() => {
+      cleanUp('vm');
+      document = await initializeThreeVersions('vm');
+
+      jest
+        .spyOn(document.native, '_countTriplesVersionMaterialized')
+        .mockImplementation((
+          subject,
+          predicate,
+          object,
+          version,
+          cb: any,
+        ) => cb(new Error('Internal error')));
+
+      await expect(document.countTriplesVersionMaterialized(null, null, null))
+        .rejects.toThrow('Internal error');
+
+      await closeAndCleanUp(document, 'vm');
+    });
   });
 
   describe('An ostrich store for an example ostrich path', () => {

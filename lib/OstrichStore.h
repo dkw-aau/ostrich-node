@@ -40,12 +40,18 @@ private:
 
     // OstrichStore#_searchTriplesVersionMaterialized(subject, predicate, object, offset, limit, version, callback, self)
     static NAN_METHOD(SearchTriplesVersionMaterialized);
+    // OstrichStore#_countTriplesVersionMaterialized(subject, predicate, object, version, callback, self)
+    static NAN_METHOD(CountTriplesVersionMaterialized);
 
     // OstrichStore#_searchTriplesDeltaMaterialized(subject, predicate, object, offset, limit, version_start, version_end, callback, self)
     static NAN_METHOD(SearchTriplesDeltaMaterialized);
+    // OstrichStore#_countTriplesDeltaMaterialized(subject, predicate, object, version_start, version_end, callback, self)
+    static NAN_METHOD(CountTriplesDeltaMaterialized);
 
     // OstrichStore#_searchTriplesVersion(subject, predicate, object, offset, limit, callback, self)
     static NAN_METHOD(SearchTriplesVersion);
+    // OstrichStore#_countTriplesVersion(subject, predicate, object, callback, self)
+    static NAN_METHOD(CountTriplesVersion);
 
     // OstrichStore#maxVersion
     static NAN_PROPERTY_GETTER(MaxVersion);

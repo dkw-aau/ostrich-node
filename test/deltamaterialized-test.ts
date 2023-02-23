@@ -87,6 +87,27 @@ describe('delta materialization', () => {
       await closeAndCleanUp(document, 'dm');
     });
 
+    it('should throw when an internal error is thrown during count', async() => {
+      cleanUp('dm');
+      document = await initializeThreeVersions('dm');
+
+      jest
+        .spyOn(document.native, '_countTriplesDeltaMaterialized')
+        .mockImplementation((
+          subject,
+          predicate,
+          object,
+          versionStart,
+          versionEnd,
+          cb: any,
+        ) => cb(new Error('Internal error')));
+
+      await expect(document.countTriplesDeltaMaterialized(null, null, null, 0, 1))
+        .rejects.toThrow('Internal error');
+
+      await closeAndCleanUp(document, 'dm');
+    });
+
     it('should throw when start is after end', async() => {
       cleanUp('dm');
       document = await initializeThreeVersions('dm');
