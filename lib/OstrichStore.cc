@@ -147,20 +147,17 @@ public:
             dict = controller->get_dictionary_manager(version);
             StringTriple triple_pattern(subject, predicate, toHdtLiteral(object));
 
-            // Estimate the total number of triples
-            std::pair<size_t, hdt::ResultEstimationType> count_data = controller->get_version_materialized_count(triple_pattern, version, true);
-            totalCount = count_data.first;
+            // Build iterator
             it = controller->get_version_materialized(triple_pattern, offset, version);
-            hasExactCount = count_data.second == hdt::EXACT;
 
             // Add matching triples to the result vector
             Triple t;
-            long count = 0;
 
             while (it->next(&t) && (limit == 0 || triples.size() < limit)) {
                 triples.push_back(t);
-                count++;
+                totalCount++;
             }
+            hasExactCount = (limit != 0 && totalCount == limit) ? hdt::APPROXIMATE : hdt::EXACT;
         } catch (const std::runtime_error &error) {
             SetErrorMessage(error.what());
         }
@@ -311,19 +308,16 @@ public:
             // Prepare the triple pattern
             StringTriple triple_pattern(subject, predicate, toHdtLiteral(object));
 
-            // Estimate the total number of triples
-            std::pair<size_t, hdt::ResultEstimationType> count_data = controller->get_delta_materialized_count(triple_pattern, version_start, version_end, true);
-            totalCount = count_data.first;
+            // Get the iterator
             it = controller->get_delta_materialized(triple_pattern, offset, version_start, version_end);
-            hasExactCount = count_data.second == hdt::EXACT;
 
             // Add matching triples to the result vector
             TripleDelta t;
-            long count = 0;
             while (it->next(&t) && (!limit || triples.size() < limit)) {
                 triples.push_back(new TripleDelta(new Triple(*t.get_triple()), t.is_addition(), t.get_dictionary()));
-                count++;
+                totalCount++;
             }
+            hasExactCount = (limit != 0 && totalCount == limit) ? hdt::APPROXIMATE : hdt::EXACT;
         } catch (const std::runtime_error &error) {
             SetErrorMessage(error.what());
         }
@@ -480,20 +474,17 @@ public:
             // Prepare the triple pattern
             StringTriple triple_pattern(subject, predicate, toHdtLiteral(object));
 
-            // Estimate the total number of triples
-            std::pair<size_t, hdt::ResultEstimationType> count_data = controller->get_version_count(triple_pattern, true);
-            totalCount = count_data.first;
+            // Get the iterator
             it = controller->get_version(triple_pattern, offset);
-            hasExactCount = count_data.second == hdt::EXACT;
 
             // Add matching triples to the result vector
             TripleVersions t;
-            long count = 0;
 
             while (it->next(&t) && (!limit || triples.size() < limit)) {
                 triples.push_back(new TripleVersions(new Triple(*t.get_triple()), new std::vector<int>(*t.get_versions()), t.get_dictionary()));
-                count++;
+                totalCount++;
             }
+            hasExactCount = (limit != 0 && totalCount == limit) ? hdt::APPROXIMATE : hdt::EXACT;
         } catch (const std::runtime_error& error) {
             SetErrorMessage(error.what());
         }
