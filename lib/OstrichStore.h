@@ -71,10 +71,4 @@ private:
     static Nan::Persistent<v8::Function> constructor;
 };
 
-// Converts a JavaScript literal to an HDT literal
-std::string &toHdtLiteral(std::string &literal);
-
-// Converts an HDT literal to a JavaScript literal
-std::string &fromHdtLiteral(std::string &literal);
-
 #endif

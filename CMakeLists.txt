@@ -38,8 +38,7 @@ include_directories(
 
 # Add source files
 file(GLOB_RECURSE SOURCE_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/ostrich.cc"
-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/OstrichStore.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/src/main/cpp/*/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/src/main/cpp/*/*.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/src/main/cpp/simpleprogresslistener.h"
