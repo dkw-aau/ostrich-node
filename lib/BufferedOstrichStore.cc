@@ -449,6 +449,12 @@ public:
         v8::Local<v8::Value> argv[argc] = {Nan::Null(), queryProcessor};
         Nan::Call(*callback, argc, argv);
     }
+
+    void HandleErrorCallback() override {
+        Nan::HandleScope scope;
+        v8::Local<v8::Value> argv[] = {v8::Exception::Error(Nan::New(ErrorMessage()).ToLocalChecked())};
+        Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
+    }
 };
 
 void BufferedOstrichStore::SearchTriplesVersionMaterialized(Nan::NAN_METHOD_ARGS_TYPE info) {
@@ -564,6 +570,12 @@ public:
         const unsigned argc = 2;
         v8::Local<v8::Value> argv[argc] = {Nan::Null(), queryProcessor};
         Nan::Call(*callback, argc, argv);
+    }
+
+    void HandleErrorCallback() override {
+        Nan::HandleScope scope;
+        v8::Local<v8::Value> argv[] = {v8::Exception::Error(Nan::New(ErrorMessage()).ToLocalChecked())};
+        Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
     }
 };
 
@@ -685,6 +697,12 @@ public:
         const unsigned argc = 2;
         v8::Local<v8::Value> argv[argc] = {Nan::Null(), queryProcessor};
         Nan::Call(*callback, argc, argv);
+    }
+
+    void HandleErrorCallback() override {
+        Nan::HandleScope scope;
+        v8::Local<v8::Value> argv[] = {v8::Exception::Error(Nan::New(ErrorMessage()).ToLocalChecked())};
+        Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
     }
 };
 
