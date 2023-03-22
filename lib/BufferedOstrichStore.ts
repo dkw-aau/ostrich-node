@@ -14,7 +14,7 @@ export class QueryIterator implements IterableIterator<RDF.Quad> {
   protected index: number;
   protected buffer: RDF.Quad[];
   protected done: boolean;
-  protected count: number;
+  protected totalCount: number;
 
   public constructor(
     public readonly bufferSize: number,
@@ -24,7 +24,7 @@ export class QueryIterator implements IterableIterator<RDF.Quad> {
     this.index = 0;
     this.buffer = [];
     this.done = false;
-    this.count = 0;
+    this.totalCount = 0;
   }
 
   public next(): IteratorResult<RDF.Quad> {
@@ -39,16 +39,19 @@ export class QueryIterator implements IterableIterator<RDF.Quad> {
     // We reached the end of the buffer or the buffer is empty -> we get more triples from native
     if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
       this.buffer = [];
-      this.queryProcessor._next(this.bufferSize, (error, triples, done) => {
-        triples.forEach(triple => this.buffer.push(stringQuadToQuad(triple)));
-        this.done = done;
+      const triples = this.queryProcessor._next(this.bufferSize);
+      let count = 0;
+      triples.forEach(triple => {
+        this.buffer.push(stringQuadToQuad(triple));
+        count++;
+        this.totalCount++;
       });
+      this.done = count < this.bufferSize;
       this.index = 0;
     }
     // There is at least one triple in the buffer, we return it and increment the index
     const triple = this.buffer[this.index];
     this.index++;
-    this.count++;
     return {
       done: false,
       value: triple,
@@ -121,7 +124,10 @@ export class BufferedOstrichStore {
             return reject(error);
           }
           resolve(
-            new QueryIterator(this.bufferSize, queryProcessor, () => this.finishOperation()),
+            new QueryIterator(this.bufferSize, queryProcessor, () => {
+              this.operations--;
+              this.finishOperation();
+            }),
           );
         },
       );
@@ -150,6 +156,7 @@ export class BufferedOstrichStore {
         serializeTerm(object),
         version,
         (error, totalCount, hasExactCount) => {
+          this.operations--;
           this.finishOperation();
           if (error) {
             return reject(error);
@@ -206,7 +213,10 @@ export class BufferedOstrichStore {
             return reject(error);
           }
           resolve(
-            new QueryIterator(this.bufferSize, queryProcessor, () => this.finishOperation()),
+            new QueryIterator(this.bufferSize, queryProcessor, () => {
+              this.operations--;
+              this.finishOperation();
+            }),
           );
         },
       );
@@ -238,6 +248,7 @@ export class BufferedOstrichStore {
         versionStart,
         versionEnd,
         (error, totalCount, hasExactCount) => {
+          this.operations--;
           this.finishOperation();
           if (error) {
             return reject(error);
@@ -284,7 +295,10 @@ export class BufferedOstrichStore {
             return reject(error);
           }
           resolve(
-            new QueryIterator(this.bufferSize, queryProcessor, () => this.finishOperation()),
+            new QueryIterator(this.bufferSize, queryProcessor, () => {
+              this.operations--;
+              this.finishOperation();
+            }),
           );
         },
       );
@@ -309,6 +323,7 @@ export class BufferedOstrichStore {
         serializeTerm(predicate),
         serializeTerm(object),
         (error, totalCount, hasExactCount) => {
+          this.operations--;
           this.finishOperation();
           if (error) {
             return reject(error);
@@ -367,6 +382,7 @@ export class BufferedOstrichStore {
         version,
         triples.map(triple => ({ addition: triple.addition, ...quadToStringQuad(triple) })),
         (error, insertedCount) => {
+          this.operations--;
           this.finishOperation();
           if (error) {
             return reject(error);
@@ -378,7 +394,6 @@ export class BufferedOstrichStore {
   }
 
   public finishOperation(): void {
-    this.operations = this.operations === 0 ? 0 : this.operations--;
     // Call the operations-callbacks if no operations are going on anymore.
     if (!this.operations) {
       for (const cb of this._operationsCallbacks) {
@@ -462,8 +477,8 @@ export function fromPathBuffered(
       options.strategyParameter = '0';
     }
 
-    if (bufferSize < -1) {
-      bufferSize = -1;
+    if (bufferSize < 1) {
+      bufferSize = 1;
     }
 
     // eslint-disable-next-line no-sync

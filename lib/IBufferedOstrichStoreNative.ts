@@ -4,29 +4,25 @@ import type { IStringQuadDelta, IStringQuadVersion } from './utils';
 export interface IQueryProcessor {
   _next: (
     number: number,
-    cb: (error: Error | undefined, triples: IStringQuad[], done: boolean) => void,
-  ) => void;
+  ) => IStringQuad[];
 }
 
 export interface IVersionMaterializationProcessor extends IQueryProcessor {
   _next: (
     number: number,
-    cb: (error: Error | undefined, triples: IStringQuad[], done: boolean) => void,
-  ) => void;
+  ) => IStringQuad[];
 }
 
 export interface IDeltaMaterializationProcessor extends IQueryProcessor {
   _next: (
     number: number,
-    cb: (error: Error | undefined, triples: IStringQuadDelta[], done: boolean) => void,
-  ) => void;
+  ) => IStringQuadDelta[];
 }
 
 export interface IVersionQueryProcessor extends IQueryProcessor {
   _next: (
     number: number,
-    cb: (error: Error | undefined, triples: IStringQuadVersion[], done: boolean) => void,
-  ) => void;
+  ) => IStringQuadVersion[];
 }
 
 /**
