@@ -4,13 +4,13 @@ import { stringQuadToQuad, termToString, quadToStringQuad } from 'rdf-string';
 import type { IBufferedOstrichStoreNative, IQueryProcessor } from './IBufferedOstrichStoreNative';
 import type { IQuadDelta } from './utils';
 import { serializeTerm, strcmp } from './utils';
-const ostrichNative = require('../build/Release/ostrich.node');
+const ostrichNative = require('../build/Release/ostrich-buffered.node');
 
 /**
  * An Iterator to iterate over query results.
  * Maintain an internal buffer of triples.
  */
-export class QueryIterator implements Iterator<RDF.Quad> {
+export class QueryIterator implements IterableIterator<RDF.Quad> {
   protected index: number;
   protected buffer: RDF.Quad[];
   protected done: boolean;
@@ -54,6 +54,10 @@ export class QueryIterator implements Iterator<RDF.Quad> {
       value: triple,
     };
   }
+
+  public [Symbol.iterator](): QueryIterator {
+    return this;
+  }
 }
 
 export class BufferedOstrichStore {
@@ -72,14 +76,14 @@ export class BufferedOstrichStore {
    * The number of available versions.
    */
   public get maxVersion(): number {
-    throw new Error('Method not implemented.');
+    return this.native.maxVersion;
   }
 
   /**
    * If the store was closed.
    */
   public get closed(): boolean {
-    throw new Error('Method not implemented.');
+    return this.native.closed;
   }
 
   /**
@@ -95,7 +99,7 @@ export class BufferedOstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
     options?: { offset?: number; version?: number },
-  ): Promise<Iterator<RDF.Quad>> {
+  ): Promise<QueryIterator> {
     return new Promise((resolve, reject) => {
       if (this.closed) {
         return reject(new Error('Attempted to query a closed OSTRICH store'));
@@ -172,7 +176,7 @@ export class BufferedOstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
     options: { offset?: number; limit?: number; versionStart: number; versionEnd: number },
-  ): Promise<Iterator<RDF.Quad>> {
+  ): Promise<QueryIterator> {
     return new Promise((resolve, reject) => {
       if (this.closed) {
         return reject(new Error('Attempted to query a closed OSTRICH store'));
@@ -259,7 +263,7 @@ export class BufferedOstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
     options?: { offset?: number; limit?: number },
-  ): Promise<Iterator<RDF.Quad>> {
+  ): Promise<QueryIterator> {
     return new Promise((resolve, reject) => {
       if (this.closed) {
         return reject(new Error('Attempted to query a closed OSTRICH store'));

@@ -23,10 +23,11 @@ public:
     }
 
     void Execute() override {
+        std::cout << "VMNextWorker::Execute" << std::endl;
         try {
             Triple t;
             uint32_t count = 0;
-            while (it->next(&t) && (count < number || count == -1)) {
+            while (it->next(&t) && (count < number || number == -1)) {
                 triples.push_back(t);
                 count++;
             }
@@ -97,7 +98,7 @@ const Nan::Persistent<v8::Function> &VersionMaterializationProcessor::GetConstru
         tpl->SetClassName(Nan::New("VersionMaterializationProcessor").ToLocalChecked());
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
         // Create prototype
-        Nan::SetPrototypeMethod(tpl, "Next", Next);
+        Nan::SetPrototypeMethod(tpl, "_next", Next);
         // Set constructor
         constructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
     }
@@ -200,7 +201,7 @@ const Nan::Persistent<v8::Function> &DeltaMaterializationProcessor::GetConstruct
         tpl->SetClassName(Nan::New("DeltaMaterializationProcessor").ToLocalChecked());
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
         // Set prototype
-        Nan::SetPrototypeMethod(tpl, "Next", Next);
+        Nan::SetPrototypeMethod(tpl, "_next", Next);
         // Set constructor
         constructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
     }
@@ -308,7 +309,7 @@ const Nan::Persistent<v8::Function> &VersionQueryProcessor::GetConstructor() {
         tpl->SetClassName(Nan::New("DeltaMaterializationProcessor").ToLocalChecked());
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
         // Set prototype
-        Nan::SetPrototypeMethod(tpl, "Next", Next);
+        Nan::SetPrototypeMethod(tpl, "_next", Next);
         // Set constructor
         constructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
     }
@@ -407,7 +408,7 @@ public:
 };
 
 void BufferedOstrichStore::Create(Nan::NAN_METHOD_ARGS_TYPE info) {
-    assert(info.Length() == 4);
+    assert(info.Length() >= 4);
     Nan::AsyncQueueWorker(new CreateWorker(*Nan::Utf8String(info[0]),
                                            info[1]->BooleanValue(info.GetIsolate()),
                                            *Nan::Utf8String(info[2]),

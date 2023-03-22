@@ -37,8 +37,7 @@ include_directories(
 )
 
 # Add source files
-file(GLOB_RECURSE SOURCE_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cc"
+file(GLOB_RECURSE OSTRICH_SOURCE_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/src/main/cpp/*/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/src/main/cpp/*/*.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/src/main/cpp/simpleprogresslistener.h"
@@ -47,16 +46,44 @@ file(GLOB_RECURSE SOURCE_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/deps/ostrich/deps/hdt/libhdt/src/*.cpp"
 )
 
-# Set cmake-js binary
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
-target_compile_definitions(${PROJECT_NAME} PUBLIC -DCOMPRESSED_ADD_VALUES -DCOMPRESSED_DEL_VALUES -DUSE_VSI -DUSE_VSI_T)
+# Compile OSTRICH as a static lib
+add_library(ostrich_core STATIC ${OSTRICH_SOURCE_FILES})
+target_compile_definitions(ostrich_core PUBLIC -DCOMPRESSED_ADD_VALUES -DCOMPRESSED_DEL_VALUES -DUSE_VSI -DUSE_VSI_T)
+set_property(TARGET ostrich_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# Source for OSTRICH node bindings
+set(SOURCE_OSTRICH_NODE
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/ostrich.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/OstrichStore.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/OstrichStore.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/LiteralsUtils.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/LiteralsUtils.cc")
+
+# Source for OSTRICH node bindings with triple buffering during querying
+set(SOURCE_BUFFERED_OSTRICH_NODE
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/bufferedOstrich.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/BufferedOstrichStore.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/BufferedOstrichStore.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/LiteralsUtils.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/LiteralsUtils.cc")
+
+# Set cmake-js binary for bindings
+add_library(${PROJECT_NAME} SHARED ${SOURCE_OSTRICH_NODE})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
+target_link_libraries(${PROJECT_NAME} ostrich_core)
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
+
+# Set cmake-js binary for buffered bindings
+add_library(${PROJECT_NAME}-buffered SHARED ${SOURCE_BUFFERED_OSTRICH_NODE})
+set_target_properties(${PROJECT_NAME}-buffered PROPERTIES PREFIX "" SUFFIX ".node")
+target_link_libraries(${PROJECT_NAME}-buffered ostrich_core)
+target_link_libraries(${PROJECT_NAME}-buffered ${CMAKE_JS_LIB})
 
 # Add boost libs
 require_boost_libs(1.70.0 iostreams)
 include_directories(${Boost_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}-buffered ${Boost_LIBRARIES})
 
 # Kyoto Cabinet dependencies
 find_library(LZMA lzma REQUIRED)
@@ -69,11 +96,14 @@ find_path(KYOTO_INCLUDE_DIR kcplantdb.h REQUIRED)
 include_directories(${KYOTO_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} ${KYOTO_CABINET} ${LZMA} ${LZO})
 target_link_libraries(${PROJECT_NAME} ZLIB::ZLIB)
+target_link_libraries(${PROJECT_NAME}-buffered ${KYOTO_CABINET} ${LZMA} ${LZO})
+target_link_libraries(${PROJECT_NAME}-buffered ZLIB::ZLIB)
 
 # Add pthreads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
+target_link_libraries(${PROJECT_NAME}-buffered Threads::Threads)
 
 if(NOT MSVC)
     set(PThreadLib -pthread)
