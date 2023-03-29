@@ -264,48 +264,8 @@ void BufferedOstrichStore::Create(Nan::NAN_METHOD_ARGS_TYPE info) {
 
 /******** SearchTriplesVersionMaterialized ********/
 
-class SearchTriplesVersionMaterializedWorker : public Nan::AsyncWorker {
-private:
-    // Parameters
-    std::string subject, predicate, object;
-    int offset, version;
-    // Intermediate objects
-    TripleIterator* it;
-    BufferedOstrichStore* store;
-    std::shared_ptr<DictionaryManager> dict;
-public:
-    SearchTriplesVersionMaterializedWorker(BufferedOstrichStore* store, std::string subject, std::string predicate, std::string object, int offset, int version, Nan::Callback* callback)
-            : Nan::AsyncWorker(callback), store(store), subject(std::move(subject)), predicate(std::move(predicate)), object(std::move(object)), offset(offset), version(version) {}
-
-    void Execute() override {
-        try {
-            StringTriple pattern(subject, predicate, object);
-            it = store->GetController()->get_version_materialized(pattern, offset, version);
-            dict = store->GetController()->get_dictionary_manager(version);
-        } catch (const std::runtime_error &error) {
-            SetErrorMessage(error.what());
-        }
-    }
-
-    void HandleOKCallback() override {
-        Nan::HandleScope scope;
-        v8::Local<v8::Object> queryProcessor = Nan::NewInstance(Nan::New(VersionMaterializationProcessor::GetConstructor())).ToLocalChecked();
-        new VersionMaterializationProcessor(it, dict, queryProcessor);
-
-        const unsigned argc = 2;
-        v8::Local<v8::Value> argv[argc] = {Nan::Null(), queryProcessor};
-        Nan::Call(*callback, argc, argv);
-    }
-
-    void HandleErrorCallback() override {
-        Nan::HandleScope scope;
-        v8::Local<v8::Value> argv[] = {v8::Exception::Error(Nan::New(ErrorMessage()).ToLocalChecked())};
-        Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
-    }
-};
-
 void BufferedOstrichStore::SearchTriplesVersionMaterialized(Nan::NAN_METHOD_ARGS_TYPE info) {
-    assert(info.Length() >= 6);
+    assert(info.Length() >= 5);
     auto thisStore = Nan::ObjectWrap::Unwrap<BufferedOstrichStore>(info.This());
 
     std::string s(*Nan::Utf8String(info[0]));
@@ -315,9 +275,13 @@ void BufferedOstrichStore::SearchTriplesVersionMaterialized(Nan::NAN_METHOD_ARGS
     int offset = info[3]->Int32Value(Nan::GetCurrentContext()).FromJust();
     int version = info[4]->Int32Value(Nan::GetCurrentContext()).FromJust();
 
-    auto callback = new Nan::Callback(info[5].As<v8::Function>());
+    TripleIterator* it = thisStore->GetController()->get_version_materialized(StringTriple(s, p, o), offset, version);
+    std::shared_ptr<DictionaryManager> dict = thisStore->GetController()->get_dictionary_manager(version);
 
-    Nan::AsyncQueueWorker(new SearchTriplesVersionMaterializedWorker(thisStore, s, p ,o, offset, version, callback));
+    v8::Local<v8::Object> queryProcessor = Nan::NewInstance(Nan::New(VersionMaterializationProcessor::GetConstructor())).ToLocalChecked();
+    new VersionMaterializationProcessor(it, dict, queryProcessor);
+
+    info.GetReturnValue().Set(queryProcessor);
 }
 
 /******** CountTriplesVersionMaterialized ********/
@@ -387,47 +351,8 @@ void BufferedOstrichStore::CountTriplesVersionMaterialized(Nan::NAN_METHOD_ARGS_
 
 /******** SearchTriplesDeltaMaterialized ********/
 
-class SearchTriplesDeltaMaterializedWorker : public Nan::AsyncWorker {
-private:
-    // Parameters
-    std::string subject, predicate, object;
-    int offset, version_start, version_end;
-    // Intermediate objects
-    TripleDeltaIterator* it;
-    BufferedOstrichStore* store;
-
-public:
-    SearchTriplesDeltaMaterializedWorker(BufferedOstrichStore* store, std::string subject, std::string predicate, std::string object, int offset, int version_start, int version_end, Nan::Callback* callback)
-            : Nan::AsyncWorker(callback), store(store), subject(std::move(subject)), predicate(std::move(predicate)), object(std::move(object)), offset(offset), version_start(version_start), version_end(version_end) {}
-
-    void Execute() override {
-        try {
-            StringTriple pattern(subject, predicate, object);
-            it = store->GetController()->get_delta_materialized(pattern, offset, version_start, version_end);
-        } catch (const std::runtime_error &error) {
-            SetErrorMessage(error.what());
-        }
-    }
-
-    void HandleOKCallback() override {
-        Nan::HandleScope scope;
-        v8::Local<v8::Object> queryProcessor = Nan::NewInstance(Nan::New(DeltaMaterializationProcessor::GetConstructor())).ToLocalChecked();
-        new DeltaMaterializationProcessor(it, queryProcessor);
-
-        const unsigned argc = 2;
-        v8::Local<v8::Value> argv[argc] = {Nan::Null(), queryProcessor};
-        Nan::Call(*callback, argc, argv);
-    }
-
-    void HandleErrorCallback() override {
-        Nan::HandleScope scope;
-        v8::Local<v8::Value> argv[] = {v8::Exception::Error(Nan::New(ErrorMessage()).ToLocalChecked())};
-        Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
-    }
-};
-
 void BufferedOstrichStore::SearchTriplesDeltaMaterialized(Nan::NAN_METHOD_ARGS_TYPE info) {
-    assert(info.Length() >= 6);
+    assert(info.Length() >= 5);
     auto thisStore = Nan::ObjectWrap::Unwrap<BufferedOstrichStore>(info.This());
 
     std::string s(*Nan::Utf8String(info[0]));
@@ -438,9 +363,12 @@ void BufferedOstrichStore::SearchTriplesDeltaMaterialized(Nan::NAN_METHOD_ARGS_T
     int version_start = info[4]->Int32Value(Nan::GetCurrentContext()).FromJust();
     int version_end = info[5]->Int32Value(Nan::GetCurrentContext()).FromJust();
 
-    auto callback = new Nan::Callback(info[6].As<v8::Function>());
+    TripleDeltaIterator* it = thisStore->GetController()->get_delta_materialized(StringTriple(s, p, o), offset, version_start, version_end);
 
-    Nan::AsyncQueueWorker(new SearchTriplesDeltaMaterializedWorker(thisStore, s, p ,o, offset, version_start, version_end, callback));
+    v8::Local<v8::Object> queryProcessor = Nan::NewInstance(Nan::New(DeltaMaterializationProcessor::GetConstructor())).ToLocalChecked();
+    new DeltaMaterializationProcessor(it, queryProcessor);
+
+    info.GetReturnValue().Set(queryProcessor);
 }
 
 /******** CountTriplesDeltaMaterialized ********/
@@ -514,47 +442,8 @@ void BufferedOstrichStore::CountTriplesDeltaMaterialized(Nan::NAN_METHOD_ARGS_TY
 
 /******** SearchTriplesVersion ********/
 
-class SearchTriplesVersionWorker : public Nan::AsyncWorker {
-private:
-    // Parameters
-    std::string subject, predicate, object;
-    int offset;
-    // Intermediate objects
-    TripleVersionsIterator* it;
-    BufferedOstrichStore* store;
-
-public:
-    SearchTriplesVersionWorker(BufferedOstrichStore* store, std::string subject, std::string predicate, std::string object, int offset, Nan::Callback* callback)
-            : Nan::AsyncWorker(callback), store(store), subject(std::move(subject)), predicate(std::move(predicate)), object(std::move(object)), offset(offset) {}
-
-    void Execute() override {
-        try {
-            StringTriple pattern(subject, predicate, object);
-            it = store->GetController()->get_version(pattern, offset);
-        } catch (const std::runtime_error &error) {
-            SetErrorMessage(error.what());
-        }
-    }
-
-    void HandleOKCallback() override {
-        Nan::HandleScope scope;
-        v8::Local<v8::Object> queryProcessor = Nan::NewInstance(Nan::New(VersionQueryProcessor::GetConstructor())).ToLocalChecked();
-        new VersionQueryProcessor(it, queryProcessor);
-
-        const unsigned argc = 2;
-        v8::Local<v8::Value> argv[argc] = {Nan::Null(), queryProcessor};
-        Nan::Call(*callback, argc, argv);
-    }
-
-    void HandleErrorCallback() override {
-        Nan::HandleScope scope;
-        v8::Local<v8::Value> argv[] = {v8::Exception::Error(Nan::New(ErrorMessage()).ToLocalChecked())};
-        Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
-    }
-};
-
 void BufferedOstrichStore::SearchTriplesVersion(Nan::NAN_METHOD_ARGS_TYPE info) {
-    assert(info.Length() >= 5);
+    assert(info.Length() >= 4);
     auto thisStore = Nan::ObjectWrap::Unwrap<BufferedOstrichStore>(info.This());
 
     std::string s(*Nan::Utf8String(info[0]));
@@ -563,11 +452,13 @@ void BufferedOstrichStore::SearchTriplesVersion(Nan::NAN_METHOD_ARGS_TYPE info) 
 
     int offset = info[3]->Int32Value(Nan::GetCurrentContext()).FromJust();
 
-    auto callback = new Nan::Callback(info[4].As<v8::Function>());
+    TripleVersionsIterator* it = thisStore->GetController()->get_version(StringTriple(s, p, o), offset);
 
-    Nan::AsyncQueueWorker(new SearchTriplesVersionWorker(thisStore, s, p ,o, offset, callback));
+    v8::Local<v8::Object> queryProcessor = Nan::NewInstance(Nan::New(VersionQueryProcessor::GetConstructor())).ToLocalChecked();
+    new VersionQueryProcessor(it, queryProcessor);
+
+    info.GetReturnValue().Set(queryProcessor);
 }
-
 
 /******** CountTriplesVersion ********/
 

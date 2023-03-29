@@ -1,39 +1,41 @@
 import * as fs from 'fs';
 import type * as RDF from '@rdfjs/types';
 import { stringQuadToQuad, termToString, quadToStringQuad } from 'rdf-string';
-import type { IBufferedOstrichStoreNative, IQueryProcessor } from './IBufferedOstrichStoreNative';
+import type { IBufferedOstrichStoreNative,
+  IVersionMaterializationProcessor,
+  IVersionQueryProcessor,
+  IDeltaMaterializationProcessor } from './IBufferedOstrichStoreNative';
 import type { IQuadDelta } from './utils';
 import { serializeTerm, strcmp } from './utils';
 const ostrichNative = require('../build/Release/ostrich-buffered.node');
 
 /**
- * An Iterator to iterate over query results.
- * Maintain an internal buffer of triples.
+ * An Iterator to iterate over VM query results.
  */
-export class QueryIterator implements IterableIterator<RDF.Quad> {
+export class VMQueryIterator implements IterableIterator<RDF.Quad> {
   protected index: number;
   protected buffer: RDF.Quad[];
   protected done: boolean;
-  protected totalCount: number;
+  protected isVQ: boolean;
 
   public constructor(
     public readonly bufferSize: number,
-    protected readonly queryProcessor: IQueryProcessor,
+    protected readonly queryProcessor: IVersionMaterializationProcessor,
     protected readonly finishCallback: (() => void),
   ) {
     this.index = 0;
     this.buffer = [];
     this.done = false;
-    this.totalCount = 0;
+    this.isVQ = false;
   }
 
   public next(): IteratorResult<RDF.Quad> {
-    // Native is done, and no more triples in the buffer
-    if (this.done && this.index === this.buffer.length) {
+    // Native is done, and index point at the last triple in the buffer
+    if (this.done && this.index === this.buffer.length - 1) {
       this.finishCallback();
       return {
         done: true,
-        value: undefined,
+        value: this.buffer[this.index],
       };
     }
     // We reached the end of the buffer or the buffer is empty -> we get more triples from native
@@ -44,21 +46,149 @@ export class QueryIterator implements IterableIterator<RDF.Quad> {
       triples.forEach(triple => {
         this.buffer.push(stringQuadToQuad(triple));
         count++;
-        this.totalCount++;
       });
       this.done = count < this.bufferSize;
       this.index = 0;
     }
     // There is at least one triple in the buffer, we return it and increment the index
-    const triple = this.buffer[this.index];
-    this.index++;
+    if (this.index < this.buffer.length) {
+      const triple = this.buffer[this.index];
+      this.index++;
+      return {
+        done: false,
+        value: triple,
+      };
+    }
+    // There are no triples, even after an attempt to fill the buffer
     return {
-      done: false,
-      value: triple,
+      done: true,
+      value: undefined,
     };
   }
 
-  public [Symbol.iterator](): QueryIterator {
+  public [Symbol.iterator](): VMQueryIterator {
+    return this;
+  }
+}
+
+export class DMQueryIterator implements IterableIterator<RDF.Quad> {
+  protected index: number;
+  protected buffer: RDF.Quad[];
+  protected done: boolean;
+  protected isVQ: boolean;
+
+  public constructor(
+    public readonly bufferSize: number,
+    protected readonly queryProcessor: IDeltaMaterializationProcessor,
+    protected readonly finishCallback: (() => void),
+  ) {
+    this.index = 0;
+    this.buffer = [];
+    this.done = false;
+    this.isVQ = false;
+  }
+
+  public next(): IteratorResult<RDF.Quad> {
+    // Native is done, and index point at the last triple in the buffer
+    if (this.done && this.index === this.buffer.length - 1) {
+      this.finishCallback();
+      return {
+        done: true,
+        value: this.buffer[this.index],
+      };
+    }
+    // We reached the end of the buffer or the buffer is empty -> we get more triples from native
+    if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
+      this.buffer = [];
+      const triples = this.queryProcessor._next(this.bufferSize);
+      let count = 0;
+      triples.forEach(triple => {
+        const quad = stringQuadToQuad(triple);
+        Object.assign(quad, { addition: triple.addition });
+        this.buffer.push(quad);
+        count++;
+      });
+      this.done = count < this.bufferSize;
+      this.index = 0;
+    }
+    // There is at least one triple in the buffer, we return it and increment the index
+    if (this.index < this.buffer.length) {
+      const triple = this.buffer[this.index];
+      this.index++;
+      return {
+        done: false,
+        value: triple,
+      };
+    }
+    // There are no triples, even after an attempt to fill the buffer
+    return {
+      done: true,
+      value: undefined,
+    };
+  }
+
+  public [Symbol.iterator](): DMQueryIterator {
+    return this;
+  }
+}
+
+export class VQQueryIterator implements IterableIterator<RDF.Quad> {
+  protected index: number;
+  protected buffer: RDF.Quad[];
+  protected done: boolean;
+  protected isVQ: boolean;
+
+  public constructor(
+    public readonly bufferSize: number,
+    protected readonly queryProcessor: IVersionQueryProcessor,
+    protected readonly finishCallback: (() => void),
+  ) {
+    this.index = 0;
+    this.buffer = [];
+    this.done = false;
+    this.isVQ = false;
+  }
+
+  public next(): IteratorResult<RDF.Quad> {
+    // Native is done, and index point at the last triple in the buffer
+    if (this.done && this.index === this.buffer.length - 1) {
+      this.finishCallback();
+      return {
+        done: true,
+        value: this.buffer[this.index],
+      };
+    }
+    // We reached the end of the buffer or the buffer is empty -> we get more triples from native
+    if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
+      this.buffer = [];
+      const triples = this.queryProcessor._next(this.bufferSize);
+      let count = 0;
+      triples.forEach(triple => {
+        const quad = stringQuadToQuad(triple);
+        Object.assign(quad, { versions: triple.versions });
+        this.buffer.push(quad);
+        count++;
+      });
+      this.done = count < this.bufferSize;
+      this.index = 0;
+    }
+    // There is at least one triple in the buffer, we return it and increment the index
+    if (this.index < this.buffer.length) {
+      const triple = this.buffer[this.index];
+      this.index++;
+      return {
+        done: false,
+        value: triple,
+      };
+    }
+    // There are no triples, even after an attempt to fill the buffer
+    return {
+      done: true,
+      value: undefined,
+    };
+  }
+
+  public [Symbol.iterator](): VQQueryIterator {
     return this;
   }
 }
@@ -102,35 +232,26 @@ export class BufferedOstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
     options?: { offset?: number; version?: number },
-  ): Promise<QueryIterator> {
-    return new Promise((resolve, reject) => {
-      if (this.closed) {
-        return reject(new Error('Attempted to query a closed OSTRICH store'));
-      }
-      if (this.maxVersion < 0) {
-        return reject(new Error('Attempted to query an OSTRICH store without versions'));
-      }
-      const offset = options && options.offset ? Math.max(0, options.offset) : 0;
-      const version = options && (options.version || options.version === 0) ? options.version : -1;
-      this.operations++;
-      this.native._searchTriplesVersionMaterialized(
-        serializeTerm(subject),
-        serializeTerm(predicate),
-        serializeTerm(object),
-        offset,
-        version,
-        (error, queryProcessor) => {
-          if (error) {
-            return reject(error);
-          }
-          resolve(
-            new QueryIterator(this.bufferSize, queryProcessor, () => {
-              this.operations--;
-              this.finishOperation();
-            }),
-          );
-        },
-      );
+  ): VMQueryIterator {
+    if (this.closed) {
+      throw new Error('Attempted to query a closed OSTRICH store');
+    }
+    if (this.maxVersion < 0) {
+      throw new Error('Attempted to query an OSTRICH store without versions');
+    }
+    const offset = options && options.offset ? Math.max(0, options.offset) : 0;
+    const version = options && (options.version || options.version === 0) ? options.version : -1;
+    this.operations++;
+    const queryProcessor = this.native._searchTriplesVersionMaterialized(
+      serializeTerm(subject),
+      serializeTerm(predicate),
+      serializeTerm(object),
+      offset,
+      version,
+    );
+    return new VMQueryIterator(this.bufferSize, queryProcessor, () => {
+      this.operations--;
+      this.finishOperation();
     });
   }
 
@@ -183,43 +304,34 @@ export class BufferedOstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
     options: { offset?: number; limit?: number; versionStart: number; versionEnd: number },
-  ): Promise<QueryIterator> {
-    return new Promise((resolve, reject) => {
-      if (this.closed) {
-        return reject(new Error('Attempted to query a closed OSTRICH store'));
-      }
-      if (this.maxVersion < 0) {
-        return reject(new Error('Attempted to query an OSTRICH store without versions'));
-      }
-      const offset = options && options.offset ? Math.max(0, options.offset) : 0;
-      const versionStart = options.versionStart;
-      const versionEnd = options.versionEnd;
-      if (versionStart >= versionEnd) {
-        return reject(new Error(`'versionStart' must be strictly smaller than 'versionEnd'`));
-      }
-      if (versionEnd > this.maxVersion) {
-        return reject(new Error(`'versionEnd' can not be larger than the maximum version (${this.maxVersion})`));
-      }
-      this.operations++;
-      this.native._searchTriplesDeltaMaterialized(
-        serializeTerm(subject),
-        serializeTerm(predicate),
-        serializeTerm(object),
-        offset,
-        versionStart,
-        versionEnd,
-        (error, queryProcessor) => {
-          if (error) {
-            return reject(error);
-          }
-          resolve(
-            new QueryIterator(this.bufferSize, queryProcessor, () => {
-              this.operations--;
-              this.finishOperation();
-            }),
-          );
-        },
-      );
+  ): DMQueryIterator {
+    if (this.closed) {
+      throw new Error('Attempted to query a closed OSTRICH store');
+    }
+    if (this.maxVersion < 0) {
+      throw new Error('Attempted to query an OSTRICH store without versions');
+    }
+    const offset = options && options.offset ? Math.max(0, options.offset) : 0;
+    const versionStart = options.versionStart;
+    const versionEnd = options.versionEnd;
+    if (versionStart >= versionEnd) {
+      throw new Error(`'versionStart' must be strictly smaller than 'versionEnd'`);
+    }
+    if (versionEnd > this.maxVersion) {
+      throw new Error(`'versionEnd' can not be larger than the maximum version (${this.maxVersion})`);
+    }
+    this.operations++;
+    const queryProcessor = this.native._searchTriplesDeltaMaterialized(
+      serializeTerm(subject),
+      serializeTerm(predicate),
+      serializeTerm(object),
+      offset,
+      versionStart,
+      versionEnd,
+    );
+    return new DMQueryIterator(this.bufferSize, queryProcessor, () => {
+      this.operations--;
+      this.finishOperation();
     });
   }
 
@@ -274,34 +386,24 @@ export class BufferedOstrichStore {
     predicate: RDF.Term | undefined | null,
     object: RDF.Term | undefined | null,
     options?: { offset?: number; limit?: number },
-  ): Promise<QueryIterator> {
-    return new Promise((resolve, reject) => {
-      if (this.closed) {
-        return reject(new Error('Attempted to query a closed OSTRICH store'));
-      }
-      if (this.maxVersion < 0) {
-        return reject(new Error('Attempted to query an OSTRICH store without versions'));
-      }
-      const offset = options && options.offset ? Math.max(0, options.offset) : 0;
-
-      this.operations++;
-      this.native._searchTriplesVersion(
-        serializeTerm(subject),
-        serializeTerm(predicate),
-        serializeTerm(object),
-        offset,
-        (error, queryProcessor) => {
-          if (error) {
-            return reject(error);
-          }
-          resolve(
-            new QueryIterator(this.bufferSize, queryProcessor, () => {
-              this.operations--;
-              this.finishOperation();
-            }),
-          );
-        },
-      );
+  ): VQQueryIterator {
+    if (this.closed) {
+      throw new Error('Attempted to query a closed OSTRICH store');
+    }
+    if (this.maxVersion < 0) {
+      throw new Error('Attempted to query an OSTRICH store without versions');
+    }
+    const offset = options && options.offset ? Math.max(0, options.offset) : 0;
+    this.operations++;
+    const queryProcessor = this.native._searchTriplesVersion(
+      serializeTerm(subject),
+      serializeTerm(predicate),
+      serializeTerm(object),
+      offset,
+    );
+    return new VQQueryIterator(this.bufferSize, queryProcessor, () => {
+      this.operations--;
+      this.finishOperation();
     });
   }
 

@@ -38,8 +38,7 @@ export interface IBufferedOstrichStoreNative {
     object: string | null,
     offset: number,
     version: number,
-    cb: (error: Error | undefined, queryProcessor: IVersionMaterializationProcessor) => void,
-  ) => void;
+  ) => IVersionMaterializationProcessor;
   _countTriplesVersionMaterialized: (
     subject: string | null,
     predicate: string | null,
@@ -54,8 +53,7 @@ export interface IBufferedOstrichStoreNative {
     offset: number,
     versionStart: number,
     versionEnd: number,
-    cb: (error: Error | undefined, queryProcessor: IDeltaMaterializationProcessor) => void,
-  ) => void;
+  ) => IDeltaMaterializationProcessor;
   _countTriplesDeltaMaterialized: (
     subject: string | null,
     predicate: string | null,
@@ -69,8 +67,7 @@ export interface IBufferedOstrichStoreNative {
     predicate: string | null,
     object: string | null,
     offset: number,
-    cb: (error: Error | undefined, queryProcessor: IVersionQueryProcessor) => void,
-  ) => void;
+  ) => IVersionQueryProcessor;
   _countTriplesVersion: (
     subject: string | null,
     predicate: string | null,
