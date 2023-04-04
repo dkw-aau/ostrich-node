@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import type * as RDF from '@rdfjs/types';
 import { stringQuadToQuad, termToString, quadToStringQuad } from 'rdf-string';
 import type { IBufferedOstrichStoreNative,
+  IQueryProcessor,
   IVersionMaterializationProcessor,
   IVersionQueryProcessor,
   IDeltaMaterializationProcessor } from './IBufferedOstrichStoreNative';
@@ -10,38 +11,63 @@ import { serializeTerm, strcmp } from './utils';
 const ostrichNative = require('../build/Release/ostrich-buffered.node');
 
 /**
- * An Iterator to iterate over VM query results.
+ * An abstract defining how results from OSTRICH are iterated
  */
-export class VMQueryIterator implements IterableIterator<RDF.Quad> {
+abstract class QueryIterator {
   protected index: number;
   protected buffer: RDF.Quad[];
   protected done: boolean;
-  protected isVQ: boolean;
 
-  public constructor(
+  protected constructor(
     public readonly bufferSize: number,
-    protected readonly queryProcessor: IVersionMaterializationProcessor,
+    protected readonly queryProcessor: IQueryProcessor,
     protected readonly finishCallback: (() => void),
   ) {
     this.index = 0;
     this.buffer = [];
     this.done = false;
-    this.isVQ = false;
   }
 
-  public next(): IteratorResult<RDF.Quad> {
+  protected abstract fillBuffer(): Promise<void>;
+
+  public async next(): Promise<RDF.Quad | undefined> {
     // Native is done, and index point at the last triple in the buffer
     if (this.done && this.index === this.buffer.length - 1) {
       this.finishCallback();
-      return {
-        done: true,
-        value: this.buffer[this.index],
-      };
+      return this.buffer[this.index];
     }
     // We reached the end of the buffer or the buffer is empty -> we get more triples from native
     if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
-      this.buffer = [];
-      const triples = this.queryProcessor._next(this.bufferSize);
+      await this.fillBuffer();
+    }
+    // There is at least one triple in the buffer, we return it and increment the index
+    if (this.index < this.buffer.length) {
+      const triple = this.buffer[this.index];
+      this.index++;
+      return triple;
+    }
+    // There are no triples, even after an attempt to fill the buffer
+    return undefined;
+  }
+}
+
+/**
+ * Iterate over VM query results.
+ */
+export class VMQueryIterator extends QueryIterator {
+  public constructor(
+    public readonly bufferSize: number,
+    protected readonly queryProcessor: IVersionMaterializationProcessor,
+    protected readonly finishCallback: (() => void),
+  ) {
+    super(bufferSize, queryProcessor, finishCallback);
+  }
+
+  protected async fillBuffer(): Promise<void> {
+    this.queryProcessor._next(this.bufferSize, (error, triples) => {
+      if (error) {
+        throw error;
+      }
       let count = 0;
       triples.forEach(triple => {
         this.buffer.push(stringQuadToQuad(triple));
@@ -49,58 +75,27 @@ export class VMQueryIterator implements IterableIterator<RDF.Quad> {
       });
       this.done = count < this.bufferSize;
       this.index = 0;
-    }
-    // There is at least one triple in the buffer, we return it and increment the index
-    if (this.index < this.buffer.length) {
-      const triple = this.buffer[this.index];
-      this.index++;
-      return {
-        done: false,
-        value: triple,
-      };
-    }
-    // There are no triples, even after an attempt to fill the buffer
-    return {
-      done: true,
-      value: undefined,
-    };
-  }
-
-  public [Symbol.iterator](): VMQueryIterator {
-    return this;
+    });
   }
 }
 
-export class DMQueryIterator implements IterableIterator<RDF.Quad> {
-  protected index: number;
-  protected buffer: RDF.Quad[];
-  protected done: boolean;
-  protected isVQ: boolean;
-
+/**
+ * Iterate over DM query results.
+ */
+export class DMQueryIterator extends QueryIterator {
   public constructor(
     public readonly bufferSize: number,
     protected readonly queryProcessor: IDeltaMaterializationProcessor,
     protected readonly finishCallback: (() => void),
   ) {
-    this.index = 0;
-    this.buffer = [];
-    this.done = false;
-    this.isVQ = false;
+    super(bufferSize, queryProcessor, finishCallback);
   }
 
-  public next(): IteratorResult<RDF.Quad> {
-    // Native is done, and index point at the last triple in the buffer
-    if (this.done && this.index === this.buffer.length - 1) {
-      this.finishCallback();
-      return {
-        done: true,
-        value: this.buffer[this.index],
-      };
-    }
-    // We reached the end of the buffer or the buffer is empty -> we get more triples from native
-    if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
-      this.buffer = [];
-      const triples = this.queryProcessor._next(this.bufferSize);
+  protected async fillBuffer(): Promise<void> {
+    this.queryProcessor._next(this.bufferSize, (error, triples) => {
+      if (error) {
+        throw error;
+      }
       let count = 0;
       triples.forEach(triple => {
         const quad = stringQuadToQuad(triple);
@@ -110,58 +105,28 @@ export class DMQueryIterator implements IterableIterator<RDF.Quad> {
       });
       this.done = count < this.bufferSize;
       this.index = 0;
-    }
-    // There is at least one triple in the buffer, we return it and increment the index
-    if (this.index < this.buffer.length) {
-      const triple = this.buffer[this.index];
-      this.index++;
-      return {
-        done: false,
-        value: triple,
-      };
-    }
-    // There are no triples, even after an attempt to fill the buffer
-    return {
-      done: true,
-      value: undefined,
-    };
-  }
-
-  public [Symbol.iterator](): DMQueryIterator {
-    return this;
+    });
   }
 }
 
-export class VQQueryIterator implements IterableIterator<RDF.Quad> {
-  protected index: number;
-  protected buffer: RDF.Quad[];
-  protected done: boolean;
-  protected isVQ: boolean;
-
+/**
+ * Iterate over VQ query results
+ */
+export class VQQueryIterator extends QueryIterator {
   public constructor(
     public readonly bufferSize: number,
     protected readonly queryProcessor: IVersionQueryProcessor,
     protected readonly finishCallback: (() => void),
   ) {
-    this.index = 0;
-    this.buffer = [];
-    this.done = false;
-    this.isVQ = false;
+    super(bufferSize, queryProcessor, finishCallback);
   }
 
-  public next(): IteratorResult<RDF.Quad> {
-    // Native is done, and index point at the last triple in the buffer
-    if (this.done && this.index === this.buffer.length - 1) {
-      this.finishCallback();
-      return {
-        done: true,
-        value: this.buffer[this.index],
-      };
-    }
-    // We reached the end of the buffer or the buffer is empty -> we get more triples from native
-    if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
+  protected async fillBuffer(): Promise<void> {
+    this.queryProcessor._next(this.bufferSize, (error, triples) => {
+      if (error) {
+        throw error;
+      }
       this.buffer = [];
-      const triples = this.queryProcessor._next(this.bufferSize);
       let count = 0;
       triples.forEach(triple => {
         const quad = stringQuadToQuad(triple);
@@ -171,25 +136,7 @@ export class VQQueryIterator implements IterableIterator<RDF.Quad> {
       });
       this.done = count < this.bufferSize;
       this.index = 0;
-    }
-    // There is at least one triple in the buffer, we return it and increment the index
-    if (this.index < this.buffer.length) {
-      const triple = this.buffer[this.index];
-      this.index++;
-      return {
-        done: false,
-        value: triple,
-      };
-    }
-    // There are no triples, even after an attempt to fill the buffer
-    return {
-      done: true,
-      value: undefined,
-    };
-  }
-
-  public [Symbol.iterator](): VQQueryIterator {
-    return this;
+    });
   }
 }
 
