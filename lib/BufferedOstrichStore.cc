@@ -4,9 +4,6 @@
 #include <utility>
 
 
-/**
- * Async Worker for VersionMaterializationProcessor::Next
- */
 class VMNextWorker: public Nan::AsyncWorker {
 private:
     TripleIterator* it;
@@ -14,28 +11,25 @@ private:
     std::shared_ptr<DictionaryManager> dict;
 
     // Callback return values
-    v8::Local<v8::Array> triplesArray;
+    std::vector<Triple> triples;
+    bool done;
 
 public:
     VMNextWorker(TripleIterator *iterator, std::shared_ptr<DictionaryManager> dict, int32_t number, Nan::Callback *callback, v8::Local<v8::Object> self)
-            : Nan::AsyncWorker(callback), it(iterator), number(number), dict(std::move(dict)), triplesArray(Nan::New<v8::Array>(number)) {
+            : Nan::AsyncWorker(callback), it(iterator), number(number), dict(std::move(dict)), done(false) {
         SaveToPersistent("self", self);
     }
 
     void Execute() override {
         try {
+            Triple t;
             uint32_t count = 0;
-            const v8::Local<v8::String> SUBJECT = Nan::New("subject").ToLocalChecked();
-            const v8::Local<v8::String> PREDICATE = Nan::New("predicate").ToLocalChecked();
-            const v8::Local<v8::String> OBJECT = Nan::New("object").ToLocalChecked();
-            Triple triple;
-            while (count < number && it->next(&triple)) {
-                v8::Local<v8::Object> tripleObject = Nan::New<v8::Object>();
-                tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(triple.get_subject(*dict).c_str()).ToLocalChecked());
-                tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(triple.get_predicate(*dict).c_str()).ToLocalChecked());
-                std::string object = triple.get_object(*dict);
-                tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
-                triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+            while (count < number && it->next(&t)) {
+                triples.push_back(t);
+                count++;
+            }
+            if (count < number) {  // if count < number, it means that the iterator is finished
+                done = true;
             }
         } catch (const std::runtime_error &error) {
             SetErrorMessage(error.what());
@@ -43,9 +37,24 @@ public:
     }
 
     void HandleOKCallback() override {
-        // Send the Javascript Array
-        const unsigned argc = 2;
-        v8::Local<v8::Value> argv[argc] = {Nan::Null(), triplesArray};
+        uint32_t count = 0;
+        v8::Local<v8::Array> triplesArray = Nan::New<v8::Array>(triples.size());
+        const v8::Local<v8::String> SUBJECT = Nan::New("subject").ToLocalChecked();
+        const v8::Local<v8::String> PREDICATE = Nan::New("predicate").ToLocalChecked();
+        const v8::Local<v8::String> OBJECT = Nan::New("object").ToLocalChecked();
+        for (auto& triple : triples) {
+            v8::Local<v8::Object> tripleObject = Nan::New<v8::Object>();
+            tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(triple.get_subject(*dict).c_str()).ToLocalChecked());
+            tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(triple.get_predicate(*dict).c_str()).ToLocalChecked());
+            std::string object = triple.get_object(*dict);
+            tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
+            triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+            triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+        }
+
+        // Send the Javascript Array and whether we are done iterating
+        const unsigned argc = 3;
+        v8::Local<v8::Value> argv[argc] = {Nan::Null(), triplesArray, Nan::New<v8::Boolean>(done)};
         Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), argc, argv);
     }
 
@@ -55,6 +64,7 @@ public:
         Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), 1, argv);
     }
 };
+
 
 // VersionMaterializationProcessor
 Nan::Persistent<v8::Function> VersionMaterializationProcessor::constructor;
@@ -92,8 +102,6 @@ const Nan::Persistent<v8::Function> &VersionMaterializationProcessor::GetConstru
     }
     return constructor;
 }
-
-
 
 /**
  * Async Worker for DeltaMaterializationProcessor::Next

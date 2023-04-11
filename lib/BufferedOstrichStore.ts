@@ -13,42 +13,19 @@ const ostrichNative = require('../build/Release/ostrich-buffered.node');
 /**
  * An abstract defining how results from OSTRICH are iterated
  */
-abstract class QueryIterator {
-  protected index: number;
-  protected buffer: RDF.Quad[];
-  protected done: boolean;
-
+export abstract class QueryIterator {
   protected constructor(
     public readonly bufferSize: number,
     protected readonly queryProcessor: IQueryProcessor,
     protected readonly finishCallback: (() => void),
-  ) {
-    this.index = 0;
-    this.buffer = [];
-    this.done = false;
-  }
+  ) {}
 
-  protected abstract fillBuffer(): Promise<void>;
-
-  public async next(): Promise<RDF.Quad | undefined> {
-    // Native is done, and index point at the last triple in the buffer
-    if (this.done && this.index === this.buffer.length - 1) {
-      this.finishCallback();
-      return this.buffer[this.index];
-    }
-    // We reached the end of the buffer or the buffer is empty -> we get more triples from native
-    if (!this.done && (this.buffer.length === this.index || this.buffer.length === 0)) {
-      await this.fillBuffer();
-    }
-    // There is at least one triple in the buffer, we return it and increment the index
-    if (this.index < this.buffer.length) {
-      const triple = this.buffer[this.index];
-      this.index++;
-      return triple;
-    }
-    // There are no triples, even after an attempt to fill the buffer
-    return undefined;
-  }
+  /**
+   * Return a tuple [done, quads]
+   * done: if there is no more quads to come
+   * quads: an array of quads
+   */
+  public abstract next(): Promise<[boolean, RDF.Quad[]]>;
 }
 
 /**
@@ -63,18 +40,22 @@ export class VMQueryIterator extends QueryIterator {
     super(bufferSize, queryProcessor, finishCallback);
   }
 
-  protected async fillBuffer(): Promise<void> {
-    this.queryProcessor._next(this.bufferSize, (error, triples) => {
-      if (error) {
-        throw error;
-      }
-      let count = 0;
-      triples.forEach(triple => {
-        this.buffer.push(stringQuadToQuad(triple));
-        count++;
+  public async next(): Promise<[boolean, RDF.Quad[]]> {
+    return new Promise((resolve, reject) => {
+      this.queryProcessor._next(this.bufferSize, (error, quads) => {
+        const buffer: RDF.Quad[] = [];
+        if (error) {
+          return reject(error);
+        }
+        quads.forEach(quad => {
+          buffer.push(stringQuadToQuad(quad));
+        });
+        const done = buffer.length < this.bufferSize;
+        if (done) {
+          this.finishCallback();
+        }
+        resolve([ done, buffer ]);
       });
-      this.done = count < this.bufferSize;
-      this.index = 0;
     });
   }
 }
@@ -91,20 +72,24 @@ export class DMQueryIterator extends QueryIterator {
     super(bufferSize, queryProcessor, finishCallback);
   }
 
-  protected async fillBuffer(): Promise<void> {
-    this.queryProcessor._next(this.bufferSize, (error, triples) => {
-      if (error) {
-        throw error;
-      }
-      let count = 0;
-      triples.forEach(triple => {
-        const quad = stringQuadToQuad(triple);
-        Object.assign(quad, { addition: triple.addition });
-        this.buffer.push(quad);
-        count++;
+  public async next(): Promise<[boolean, RDF.Quad[]]> {
+    return new Promise((resolve, reject) => {
+      this.queryProcessor._next(this.bufferSize, (error, quadsDM) => {
+        const buffer: RDF.Quad[] = [];
+        if (error) {
+          return reject(error);
+        }
+        quadsDM.forEach(quadDM => {
+          const quad = stringQuadToQuad(quadDM);
+          Object.assign(quad, { addition: quadDM.addition });
+          buffer.push(quad);
+        });
+        const done = buffer.length < this.bufferSize;
+        if (done) {
+          this.finishCallback();
+        }
+        resolve([ done, buffer ]);
       });
-      this.done = count < this.bufferSize;
-      this.index = 0;
     });
   }
 }
@@ -121,21 +106,24 @@ export class VQQueryIterator extends QueryIterator {
     super(bufferSize, queryProcessor, finishCallback);
   }
 
-  protected async fillBuffer(): Promise<void> {
-    this.queryProcessor._next(this.bufferSize, (error, triples) => {
-      if (error) {
-        throw error;
-      }
-      this.buffer = [];
-      let count = 0;
-      triples.forEach(triple => {
-        const quad = stringQuadToQuad(triple);
-        Object.assign(quad, { versions: triple.versions });
-        this.buffer.push(quad);
-        count++;
+  public async next(): Promise<[boolean, RDF.Quad[]]> {
+    return new Promise((resolve, reject) => {
+      this.queryProcessor._next(this.bufferSize, (error, quadsV) => {
+        const buffer: RDF.Quad[] = [];
+        if (error) {
+          return reject(error);
+        }
+        quadsV.forEach(quadV => {
+          const quad = stringQuadToQuad(quadV);
+          Object.assign(quad, { versions: quadV.versions });
+          buffer.push(quad);
+        });
+        const done = buffer.length < this.bufferSize;
+        if (done) {
+          this.finishCallback();
+        }
+        resolve([ done, buffer ]);
       });
-      this.done = count < this.bufferSize;
-      this.index = 0;
     });
   }
 }
