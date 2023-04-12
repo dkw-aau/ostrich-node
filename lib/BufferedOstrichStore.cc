@@ -112,32 +112,25 @@ private:
     int32_t number;
 
     // Callback return values
-    v8::Local<v8::Array> triplesArray;
+    std::vector<TripleDelta*> triples;
+    bool done;
 
 public:
     DMNextWorker(TripleDeltaIterator *iterator, int32_t number, Nan::Callback *callback, v8::Local<v8::Object> self)
-            : Nan::AsyncWorker(callback), it(iterator), number(number), triplesArray(Nan::New<v8::Array>(number)) {
+            : Nan::AsyncWorker(callback), it(iterator), number(number), done(false) {
         SaveToPersistent("self", self);
     }
 
     void Execute() override {
         try {
-            TripleDelta triple;
+            TripleDelta t;
             uint32_t count = 0;
-            const v8::Local<v8::String> SUBJECT = Nan::New("subject").ToLocalChecked();
-            const v8::Local<v8::String> PREDICATE = Nan::New("predicate").ToLocalChecked();
-            const v8::Local<v8::String> OBJECT = Nan::New("object").ToLocalChecked();
-            const v8::Local<v8::String> ADDITION = Nan::New("addition").ToLocalChecked();
-            while (count < number && it->next(&triple)) {
-                Triple* t = triple.get_triple();
-                std::shared_ptr<DictionaryManager> dict = triple.get_dictionary();
-                v8::Local<v8::Object> tripleObject = Nan::New<v8::Object>();
-                tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(t->get_subject(*dict).c_str()).ToLocalChecked());
-                tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(t->get_predicate(*dict).c_str()).ToLocalChecked());
-                std::string object = t->get_object(*dict);
-                tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
-                tripleObject->Set(Nan::GetCurrentContext(), ADDITION, Nan::New(triple.is_addition()));
-                triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+            while (it->next(&t) && (count < number || count == -1)) {
+                triples.push_back(new TripleDelta(new Triple(*t.get_triple()), t.is_addition(), t.get_dictionary()));
+                count++;
+            }
+            if (count < number) {  // if count < number, it means that the iterator is finished
+                done = true;
             }
         } catch (const std::runtime_error &error) {
             SetErrorMessage(error.what());
@@ -145,9 +138,28 @@ public:
     }
 
     void HandleOKCallback() override {
-        // Send the Javascript Array
-        const unsigned argc = 2;
-        v8::Local<v8::Value> argv[argc] = {Nan::Null(), triplesArray};
+        uint32_t count = 0;
+        v8::Local<v8::Array> triplesArray = Nan::New<v8::Array>(triples.size());
+        const v8::Local<v8::String> SUBJECT = Nan::New("subject").ToLocalChecked();
+        const v8::Local<v8::String> PREDICATE = Nan::New("predicate").ToLocalChecked();
+        const v8::Local<v8::String> OBJECT = Nan::New("object").ToLocalChecked();
+        const v8::Local<v8::String> ADDITION = Nan::New("addition").ToLocalChecked();
+        for (auto& triple : triples) {
+            Triple* t = triple->get_triple();
+            std::shared_ptr<DictionaryManager> dict = triple->get_dictionary();
+            v8::Local<v8::Object> tripleObject = Nan::New<v8::Object>();
+            tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(t->get_subject(*dict).c_str()).ToLocalChecked());
+            tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(t->get_predicate(*dict).c_str()).ToLocalChecked());
+            std::string object = t->get_object(*dict);
+            tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
+            tripleObject->Set(Nan::GetCurrentContext(), ADDITION, Nan::New(triple->is_addition()));
+            triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+            delete triple;
+        }
+
+        // Send the Javascript Array and whether we are done iterating
+        const unsigned argc = 3;
+        v8::Local<v8::Value> argv[argc] = {Nan::Null(), triplesArray, Nan::New<v8::Boolean>(done)};
         Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), argc, argv);
     }
 
@@ -199,42 +211,34 @@ const Nan::Persistent<v8::Function> &DeltaMaterializationProcessor::GetConstruct
 /**
  * Async Worker for VersionQueryProcessor::Next
  */
+/**
+ * Async Worker for VersionQueryProcessor::Next
+ */
 class VQNextWorker: public Nan::AsyncWorker {
 private:
     TripleVersionsIterator* it;
     int32_t number;
 
     // Callback return values
-    v8::Local<v8::Array> triplesArray;
+    std::vector<TripleVersions*> triples;
+    bool done;
 
 public:
     VQNextWorker(TripleVersionsIterator *iterator, int32_t number, Nan::Callback *callback, v8::Local<v8::Object> self)
-            : Nan::AsyncWorker(callback), it(iterator), number(number), triplesArray(Nan::New<v8::Array>(number)) {
+            : Nan::AsyncWorker(callback), it(iterator), number(number), done(false) {
         SaveToPersistent("self", self);
     }
 
     void Execute() override {
         try {
-            TripleVersions triple;
+            TripleVersions t;
             uint32_t count = 0;
-            const v8::Local<v8::String> SUBJECT = Nan::New("subject").ToLocalChecked();
-            const v8::Local<v8::String> PREDICATE = Nan::New("predicate").ToLocalChecked();
-            const v8::Local<v8::String> OBJECT = Nan::New("object").ToLocalChecked();
-            const v8::Local<v8::String> VERSIONS = Nan::New("versions").ToLocalChecked();
-            while (count < number && it->next(&triple)) {
-                std::shared_ptr<DictionaryManager> dict = triple.get_dictionary();
-                v8::Local<v8::Object> tripleObject = Nan::New<v8::Object>();
-                tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(triple.get_triple()->get_subject(*dict).c_str()).ToLocalChecked());
-                tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(triple.get_triple()->get_predicate(*dict).c_str()).ToLocalChecked());
-                std::string object = triple.get_triple()->get_object(*dict);
-                tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
-
-                v8::Local<v8::Array> versionsArray = Nan::New<v8::Array>(triple.get_versions()->size());
-                for (uint32_t countVersions = 0; countVersions < triple.get_versions()->size(); countVersions++) {
-                    versionsArray->Set(Nan::GetCurrentContext(), countVersions, Nan::New((*(triple.get_versions()))[countVersions]));
-                }
-                tripleObject->Set(Nan::GetCurrentContext(), VERSIONS, versionsArray);
-                triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+            while (it->next(&t) && (count < number || count == -1)) {
+                triples.push_back(new TripleVersions(new Triple(*t.get_triple()), new std::vector<int>(*t.get_versions()), t.get_dictionary()));
+                count++;
+            }
+            if (count < number) {  // if count < number, it means that the iterator is finished
+                done = true;
             }
         } catch (const std::runtime_error &error) {
             SetErrorMessage(error.what());
@@ -242,9 +246,33 @@ public:
     }
 
     void HandleOKCallback() override {
+        uint32_t count = 0;
+        v8::Local<v8::Array> triplesArray = Nan::New<v8::Array>(triples.size());
+        const v8::Local<v8::String> SUBJECT = Nan::New("subject").ToLocalChecked();
+        const v8::Local<v8::String> PREDICATE = Nan::New("predicate").ToLocalChecked();
+        const v8::Local<v8::String> OBJECT = Nan::New("object").ToLocalChecked();
+        const v8::Local<v8::String> VERSIONS = Nan::New("versions").ToLocalChecked();
+        for (auto& t: triples) {
+            std::shared_ptr<DictionaryManager> dict = t->get_dictionary();
+            v8::Local<v8::Object> tripleObject = Nan::New<v8::Object>();
+            tripleObject->Set(Nan::GetCurrentContext(), SUBJECT, Nan::New(t->get_triple()->get_subject(*dict).c_str()).ToLocalChecked());
+            tripleObject->Set(Nan::GetCurrentContext(), PREDICATE, Nan::New(t->get_triple()->get_predicate(*dict).c_str()).ToLocalChecked());
+            std::string object = t->get_triple()->get_object(*dict);
+            tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
+
+            v8::Local<v8::Array> versionsArray = Nan::New<v8::Array>(t->get_versions()->size());
+            for (uint32_t countVersions = 0; countVersions < t->get_versions()->size(); countVersions++) {
+                versionsArray->Set(Nan::GetCurrentContext(), countVersions, Nan::New((*(t->get_versions()))[countVersions]));
+            }
+            tripleObject->Set(Nan::GetCurrentContext(), VERSIONS, versionsArray);
+            triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
+            delete t->get_triple();
+            delete t->get_versions();
+        }
+
         // Send the Javascript Array and whether we are done iterating
-        const unsigned argc = 2;
-        v8::Local<v8::Value> argv[argc] = {Nan::Null(), triplesArray};
+        const unsigned argc = 3;
+        v8::Local<v8::Value> argv[argc] = {Nan::Null(), triplesArray, Nan::New<v8::Boolean>(done)};
         Nan::Call(*callback, GetFromPersistent("self")->ToObject(Nan::GetCurrentContext()).ToLocalChecked(), argc, argv);
     }
 
