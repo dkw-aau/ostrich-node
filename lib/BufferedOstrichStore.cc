@@ -49,7 +49,6 @@ public:
             std::string object = triple.get_object(*dict);
             tripleObject->Set(Nan::GetCurrentContext(), OBJECT, Nan::New(fromHdtLiteral(object).c_str()).ToLocalChecked());
             triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
-            triplesArray->Set(Nan::GetCurrentContext(), count++, tripleObject);
         }
 
         // Send the Javascript Array and whether we are done iterating
@@ -207,10 +206,6 @@ const Nan::Persistent<v8::Function> &DeltaMaterializationProcessor::GetConstruct
 
 
 
-
-/**
- * Async Worker for VersionQueryProcessor::Next
- */
 /**
  * Async Worker for VersionQueryProcessor::Next
  */
